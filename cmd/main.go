@@ -12,7 +12,7 @@ import (
 	"github.com/alltomatos/clawflow/internal/db"
 )
 
-//go:embed all:ui/dist
+//go:embed ui/dist/*
 var uiAssets embed.FS
 
 func main() {
