@@ -6,6 +6,7 @@ import (
 
 	"github.com/alltomatos/clawflow/internal/agent"
 	"github.com/alltomatos/clawflow/internal/core"
+	"github.com/alltomatos/clawflow/internal/db"
 )
 
 func main() {
@@ -18,13 +19,21 @@ func main() {
 	}
 	fmt.Printf("Config carregada! Gateway na porta: %d\n", cfg.Gateway.Port)
 
-	// 2. Conectar ao Gateway como Operador
+	// 2. Inicializar Banco de Dados (SQLite)
+	store, err := db.NewStore()
+	if err != nil {
+		log.Fatalf("Erro ao inicializar SQLite: %v", err)
+	}
+	fmt.Println("Banco de dados SQLite pronto!")
+	defer store.DB.Close()
+
+	// 3. Conectar ao Gateway como Operador
 	client := agent.NewClient(cfg)
 	if err := client.Connect(); err != nil {
-		fmt.Printf("Aviso: No foi possvel conectar ao Gateway (ele est online?): %v\n", err)
+		fmt.Printf("Aviso: No foi possvel conectar ao Gateway: %v\n", err)
 	}
 
-	// 3. Manter vivo (Skeleton loop)
+	// 4. Manter vivo
 	fmt.Println("ClawFlow rodando. Pressione Ctrl+C para sair.")
 	select {}
 }
