@@ -12,20 +12,20 @@ import (
 	"github.com/alltomatos/clawflow/internal/core"
 )
 
-// Client representa a conexo com o Gateway OpenClaw
+// Client representa a conexão com o Gateway OpenClaw
 type Client struct {
 	conn   *websocket.Conn
 	config *core.OpenClawConfig
 }
 
-// NewClient cria uma nova instncia do cliente agentico
+// NewClient cria uma nova instância do cliente agentico
 func NewClient(cfg *core.OpenClawConfig) *Client {
 	return &Client{
 		config: cfg,
 	}
 }
 
-// Connect inicia a conexo WebSocket e realiza o handshake
+// Connect inicia a conexão WebSocket e realiza o handshake
 func (c *Client) Connect() error {
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("127.0.0.1:%d", c.config.Gateway.Port), Path: "/ws"}
 	log.Printf("Conectando ao Gateway OpenClaw em %s", u.String())
@@ -56,7 +56,7 @@ func (c *Client) listen() {
 			continue
 		}
 
-		// Lgica de resposta ao challenge do protocolo v3
+		// Lógica de resposta ao challenge do protocolo v3
 		if msg["event"] == "connect.challenge" {
 			log.Println("Challenge recebido. Respondendo com Handshake...")
 			c.sendHandshake()
@@ -65,7 +65,8 @@ func (c *Client) listen() {
 }
 
 func (c *Client) sendHandshake() {
-	// Estrutura completa de conexo exigida pelo protocolo OpenClaw v3
+	// Protocolo v3 exige que o client.id seja um dos valores permitidos (cli, web, app, node, bot)
+	// Usaremos "bot" para o ClawFlow para maior compatibilidade
 	handshake := map[string]interface{}{
 		"type": "req",
 		"id":   fmt.Sprintf("clawflow-%d", time.Now().Unix()),
@@ -79,7 +80,7 @@ func (c *Client) sendHandshake() {
 				"token": c.config.Gateway.Token,
 			},
 			"client": map[string]interface{}{
-				"id":       "clawflow",
+				"id":       "bot", 
 				"version":  "0.1.0",
 				"platform": runtime.GOOS,
 				"mode":     "operator",
