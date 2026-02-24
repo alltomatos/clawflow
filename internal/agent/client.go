@@ -65,8 +65,8 @@ func (c *Client) listen() {
 }
 
 func (c *Client) sendHandshake() {
-	// Protocolo v3 EXIGE que o client.id seja EXATAMENTE um desses: "cli" | "web" | "app" | "node"
-	// Como somos um serviço de automação rodando via binário, o ID "cli" é o mais adequado e aceito.
+	// Protocolo v3 exige que o client.id seja EXATAMENTE um dos permitidos (cli, web, app, node)
+	// Usaremos "cli" para evitar a rejeição do Gateway.
 	handshake := map[string]interface{}{
 		"type": "req",
 		"id":   fmt.Sprintf("clawflow-%d", time.Now().Unix()),
