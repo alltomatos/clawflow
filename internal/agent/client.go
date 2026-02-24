@@ -12,20 +12,20 @@ import (
 	"github.com/alltomatos/clawflow/internal/core"
 )
 
-// Client representa a conexão com o Gateway OpenClaw
+// Client representa a conexo com o Gateway OpenClaw
 type Client struct {
 	conn   *websocket.Conn
 	config *core.OpenClawConfig
 }
 
-// NewClient cria uma nova instância do cliente agentico
+// NewClient cria uma nova instncia do cliente agentico
 func NewClient(cfg *core.OpenClawConfig) *Client {
 	return &Client{
 		config: cfg,
 	}
 }
 
-// Connect inicia a conexão WebSocket e realiza o handshake
+// Connect inicia a conexo WebSocket e realiza o handshake
 func (c *Client) Connect() error {
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("127.0.0.1:%d", c.config.Gateway.Port), Path: "/ws"}
 	log.Printf("Conectando ao Gateway OpenClaw em %s", u.String())
@@ -56,7 +56,7 @@ func (c *Client) listen() {
 			continue
 		}
 
-		// Lógica de resposta ao challenge do protocolo v3
+		// Lgica de resposta ao challenge do protocolo v3
 		if msg["event"] == "connect.challenge" {
 			log.Println("Challenge recebido. Respondendo com Handshake...")
 			c.sendHandshake()
