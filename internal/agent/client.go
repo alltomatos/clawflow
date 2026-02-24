@@ -65,7 +65,8 @@ func (c *Client) listen() {
 }
 
 func (c *Client) sendHandshake() {
-	// Protocolo v3: client.id deve ser "cli" e client.mode deve ser "operator"
+	// Protocolo v3: O client.mode DEVE ser "operator" ou "node".
+	// Para ferramentas de controle/CLI, o ID deve ser "cli" e o mode "operator".
 	handshake := map[string]interface{}{
 		"type": "req",
 		"id":   fmt.Sprintf("clawflow-%d", time.Now().Unix()),
