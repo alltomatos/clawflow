@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -650,17 +652,64 @@ func (s *Server) syncIncrementalDeliverables(ctx context.Context, project *core.
 	}
 
 	entry := fmt.Sprintf("\n\n## Marco %s\n- Input usuário: %s\n- Resposta gestor: %s\n", time.Now().Format("2006-01-02 15:04"), compactText(userMessage, 220), compactText(agentReply, 260))
+	updated := false
 	for _, name := range targets {
 		path := filepath.Join(docsDir, name)
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			continue
+		if err := appendWithRotation(path, entry, 180_000); err == nil {
+			updated = true
 		}
-		_, _ = f.WriteString(entry)
-		_ = f.Close()
+	}
+	if updated {
+		_ = checkpointProjectDocs(project.Path, st.Niche, userMessage, agentReply)
+	}
+	return nil
+}
+
+func appendWithRotation(path, entry string, maxBytes int64) error {
+	if maxBytes <= 0 {
+		maxBytes = 180_000
+	}
+	if info, err := os.Stat(path); err == nil && info.Size() >= maxBytes {
+		stamp := time.Now().Format("20060102-150405")
+		rotated := fmt.Sprintf("%s.%s.bak", path, stamp)
+		if err := os.Rename(path, rotated); err == nil {
+			header := fmt.Sprintf("# Arquivo rotacionado\n\nOrigem: %s\nData: %s\n\n", filepath.Base(path), time.Now().Format(time.RFC3339))
+			_ = os.WriteFile(path, []byte(header), 0644)
+		}
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(entry)
+	return err
+}
+
+func checkpointProjectDocs(projectPath, niche, userMessage, agentReply string) error {
+	if strings.TrimSpace(projectPath) == "" {
+		return nil
+	}
+	h := sha1.Sum([]byte(compactText(userMessage, 120) + "|" + compactText(agentReply, 120)))
+	hash := hex.EncodeToString(h[:])[:8]
+	msg := fmt.Sprintf("chore(docs): marco %s [%s]", strings.ToLower(strings.TrimSpace(niche)), hash)
+
+	cmdAdd := exec.Command("git", "-C", projectPath, "add", "docs")
+	if out, err := cmdAdd.CombinedOutput(); err != nil {
+		_ = out
+		return nil // não quebrar fluxo do MVP
+	}
+	cmdCommit := exec.Command("git", "-C", projectPath, "commit", "-m", msg)
+	out, err := cmdCommit.CombinedOutput()
+	if err != nil {
+		// Sem mudanças para commit é esperado em alguns ciclos
+		if strings.Contains(strings.ToLower(string(out)), "nothing to commit") {
+			return nil
+		}
+		return nil
 	}
 	return nil
 }
