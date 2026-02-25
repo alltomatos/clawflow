@@ -251,12 +251,7 @@ func (s *Server) handleManagerMessage(w http.ResponseWriter, r *http.Request, pr
 
 	_ = s.store.AddProjectMessage(r.Context(), project.ID, "user", req.Message)
 
-	reply := "Integração com sessions_send habilitada para próxima etapa."
-	mode := "openclaw-enabled"
-	if !s.managerEnabled {
-		reply = "Gestor do projeto ativo em modo local (API econômica). Mensagem registrada."
-		mode = "local-fallback"
-	}
+	reply, mode := s.nextPlannerReply(r.Context(), project, req.Message)
 	_ = s.store.AddProjectMessage(r.Context(), project.ID, "agent", reply)
 	_ = s.refreshProjectSummary(r.Context(), project.ID)
 
@@ -320,6 +315,93 @@ func (s *Server) handleManagerControl(w http.ResponseWriter, r *http.Request, pr
 		"manager_session_key": sessionKey,
 		"manager_status":      status,
 	})
+}
+
+func (s *Server) nextPlannerReply(ctx context.Context, project *core.Project, userMessage string) (string, string) {
+	mode := "openclaw-enabled"
+	if !s.managerEnabled {
+		mode = "local-fallback"
+	}
+
+	st, _ := s.store.GetPlannerState(ctx, project.ID)
+	if st == nil {
+		st = &db.PlannerState{ProjectID: project.ID, Stage: "triage_type"}
+	}
+
+	msg := strings.ToLower(strings.TrimSpace(userMessage))
+	normalized := strings.Join(strings.Fields(msg), " ")
+
+	reply := "Recebido."
+	switch st.Stage {
+	case "triage_type":
+		if strings.Contains(normalized, "novo") {
+			st.ProjectType = "novo"
+			st.Stage = "triage_niche"
+			reply = "Perfeito. Projeto Novo confirmado. Qual o nicho principal? (software, conteúdo, prospecção/vendas, gestão/operacional)"
+		} else if strings.Contains(normalized, "existente") {
+			st.ProjectType = "existente"
+			st.Stage = "triage_niche"
+			reply = "Perfeito. Projeto Existente confirmado. Qual o nicho principal para engenharia reversa? (software, conteúdo, prospecção/vendas, gestão/operacional)"
+		} else {
+			reply = "Para iniciar a triagem: este projeto é Novo ou Existente?"
+		}
+	case "triage_niche":
+		st.Niche = detectNiche(normalized)
+		if st.Niche == "" {
+			reply = "Me diga o nicho principal: software, conteúdo, prospecção/vendas, gestão ou operacional."
+		} else {
+			st.Stage = "objective"
+			reply = fmt.Sprintf("Nicho '%s' definido. Agora descreva o objetivo principal em 1-2 frases.", st.Niche)
+		}
+	case "objective":
+		st.Objective = strings.TrimSpace(userMessage)
+		st.Stage = "deliverables"
+		reply = "Objetivo registrado. Quais entregáveis imediatos você espera nesta fase (MVP/plano/checklists/scripts/docs)?"
+	case "deliverables":
+		st.Deliverables = strings.TrimSpace(userMessage)
+		st.Stage = "active"
+		reply = "Excelente. Triagem concluída. Vou manter o PLANNING.md atualizado conforme o avanço do projeto."
+	default:
+		reply = "Contexto recebido. Vou atualizar os marcos e próximos passos no PLANNING.md."
+	}
+
+	_ = s.store.UpsertPlannerState(ctx, st)
+	_ = s.updatePlanningFromState(project, st)
+	return reply, mode
+}
+
+func detectNiche(msg string) string {
+	switch {
+	case strings.Contains(msg, "software"), strings.Contains(msg, "sistema"), strings.Contains(msg, "api"):
+		return "software"
+	case strings.Contains(msg, "conteúdo"), strings.Contains(msg, "conteudo"), strings.Contains(msg, "editorial"):
+		return "conteudo"
+	case strings.Contains(msg, "prospec"), strings.Contains(msg, "vendas"), strings.Contains(msg, "funil"):
+		return "prospeccao"
+	case strings.Contains(msg, "gest"):
+		return "gestao"
+	case strings.Contains(msg, "operac"), strings.Contains(msg, "checklist"), strings.Contains(msg, "invent"):
+		return "operacional"
+	default:
+		return ""
+	}
+}
+
+func (s *Server) updatePlanningFromState(project *core.Project, st *db.PlannerState) error {
+	if project == nil || st == nil {
+		return nil
+	}
+	planningPath := filepath.Join(project.Path, "docs", "PLANNING.md")
+	base := fmt.Sprintf("# PLANNING.md\n\nProjeto: %s\n\n## Triagem Inicial\n- Tipo: %s\n- Nicho: %s\n- Etapa: %s\n\n## Objetivo\n%s\n\n## Entregáveis\n%s\n\n## Próximos passos\n- Continuar execução pelo chat do gestor dedicado.\n- Atualizar este documento a cada marco relevante.\n", project.Name, emptyOrPending(st.ProjectType), emptyOrPending(st.Niche), st.Stage, emptyOrPending(st.Objective), emptyOrPending(st.Deliverables))
+	return os.WriteFile(planningPath, []byte(base), 0644)
+}
+
+func emptyOrPending(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "pendente"
+	}
+	return v
 }
 
 func (s *Server) refreshProjectSummary(ctx context.Context, projectID string) error {

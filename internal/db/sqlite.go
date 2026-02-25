@@ -91,6 +91,17 @@ func (s *Store) migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (project_id) REFERENCES projects(id)
 	);
+
+	CREATE TABLE IF NOT EXISTS project_planner_state (
+		project_id TEXT PRIMARY KEY,
+		stage TEXT NOT NULL,
+		project_type TEXT,
+		niche TEXT,
+		objective TEXT,
+		deliverables TEXT,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (project_id) REFERENCES projects(id)
+	);
 	`
 	if _, err := s.DB.Exec(query); err != nil {
 		return err
