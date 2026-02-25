@@ -12,31 +12,27 @@ Pergunta obrigatória para início de qualquer projeto:
 
 ### PASSO 2: O Roteamento
 
-#### CAMINHO A: Projeto Novo (Ideação)
-**Objetivo:** Extrair regras de negócio e definir a arquitetura inicial.
-1. **Entrevista:**
-   - Qual o objetivo principal e o problema que este software resolve?
-   - Quem são os usuários finais (atores)?
-   - Quais as principais funcionalidades esperadas para o MVP?
-   - Há preferência de stack tecnológica ou restrição de infraestrutura?
-2. **Entregáveis (Documento Unificado):**
-   - **PRD Inicial:** Visão, Objetivos, Histórias de Usuário.
-   - **DER:** Entidades e relacionamentos (Texto ou Mermaid.js).
-   - **POPs Iniciais:** Configuração de ambiente local e CI/CD padrão.
+#### CAMINHO A: Projeto Novo (Ideação/Criação)
+**Objetivo:** Extrair a essência do projeto e definir os trilhos para a execução.
+1. **Entrevista Contextual (O Agente deve adaptar as perguntas ao nicho):**
+   - **Geral:** Qual o objetivo principal e o problema que estamos resolvendo?
+   - **Atores:** Quem são os usuários finais, clientes ou público-alvo?
+   - **Entregáveis (MVP):** Quais as metas imediatas para a primeira fase?
+   - **Ferramentas/Stack:** Qual a preferência de tecnologia, plataformas ou recursos físicos?
+2. **Ação do Agente:** Gerar o Documento Unificado em `docs/PLANNING.md`.
+3. **Estrutura do PLANNING.md (Flexível conforme o nicho):**
+   - **Software:** PRD, DER e POPs Técnicos.
+   - **Gestão/Prospecção:** Plano de Ação, Funil de Atendimento, Script de Abordagem.
+   - **Conteúdo:** Calendário Editorial, Persona de Marca, Guia de Estilo.
+   - **Operacional:** Checklists de Checklist, Inventário, POPs de Execução Local.
 
-#### CAMINHO B: Projeto Existente (Engenharia Reversa)
-**Objetivo:** Mapear o sistema atual e identificar gargalos.
+#### CAMINHO B: Projeto Existente (Engenharia Reversa / Gestão de Fluxo)
+**Objetivo:** Mapear o estado atual e organizar o caos.
 1. **Insumos Requeridos:**
-   - **Controle de Versão:** Perguntar se o projeto possui repositório Git.
-   - **Acesso:** Se sim, solicitar a URL do repositório e orientações específicas sobre como realizar o clone (ex: necessidade de chaves SSH, subpáginas, dependências externas).
-   - **Código:** Caso não haja Git, solicitar que cole trechos de código estruturais (Models, Rotas, Controllers) ou Schema SQL.
-   - **Contexto:** Arquivos de configuração (docker-compose, go.mod, package.json).
-   - **Dores:** Principais dificuldades na manutenção ou operação atual.
-2. **Ação do Agente:** Clonar o repositório dentro do workspace do OpenClaw para análise profunda se os acessos forem fornecidos.
-3. **Entregáveis (Documento Unificado):**
-   - **PRD Retrospectivo:** O que o sistema faz (baseado no código).
-   - **DER Extraído:** Mapeamento de tabelas e relações.
-   - **POPs Operacionais:** Troubleshooting, Manutenção, Deploy e Onboarding Técnico.
+   - **Histórico:** Já possui documentos, repositório ou registros prévios?
+   - **Raio-X:** Se software, cole código/schema. Se gestão, cole planilhas/processos atuais.
+   - **Gargalos:** Quais as maiores dores na operação atual?
+2. **Ação do Agente:** Consolidar em `docs/PLANNING.md` um "Mapa de Situação" e o plano de melhoria imediata.
 
 ---
 
