@@ -758,6 +758,7 @@ func (s *Server) syncIncrementalDeliverables(ctx context.Context, project *core.
 		}
 	}
 	if updated {
+		_ = s.updateManagerLearnings(ctx, project, st, userMessage, agentReply)
 		_ = checkpointProjectDocs(project.Path, st.Niche, userMessage, agentReply)
 	}
 	return nil
@@ -782,6 +783,31 @@ func appendWithRotation(path, entry string, maxBytes int64) error {
 	defer f.Close()
 	_, err = f.WriteString(entry)
 	return err
+}
+
+func (s *Server) updateManagerLearnings(ctx context.Context, project *core.Project, st *db.PlannerState, userMessage, agentReply string) error {
+	if project == nil {
+		return nil
+	}
+	learningsPath := filepath.Join(project.Path, "docs", "LEARNINGS.md")
+	if _, err := os.Stat(learningsPath); os.IsNotExist(err) {
+		header := "# LEARNINGS.md\n\nAprendizados automáticos do gestor com base na conversa e documentos do projeto.\n"
+		_ = os.WriteFile(learningsPath, []byte(header), 0644)
+	}
+
+	decision := compactText(agentReply, 180)
+	risk := "Sem risco explícito"
+	lowUser := strings.ToLower(userMessage)
+	if strings.Contains(lowUser, "erro") || strings.Contains(lowUser, "falha") || strings.Contains(lowUser, "risco") || strings.Contains(lowUser, "bloque") {
+		risk = compactText(userMessage, 140)
+	}
+	next := "Refinar próximo passo no chat"
+	if st != nil && strings.TrimSpace(st.Stage) != "" {
+		next = fmt.Sprintf("Avançar etapa '%s' com entrega documentada em docs/", st.Stage)
+	}
+
+	entry := fmt.Sprintf("\n\n## Learning %s\n- Decisão: %s\n- Risco: %s\n- Próximo passo: %s\n", time.Now().Format("2006-01-02 15:04"), decision, risk, next)
+	return appendWithRotation(learningsPath, entry, 180_000)
 }
 
 func checkpointProjectDocs(projectPath, niche, userMessage, agentReply string) error {
