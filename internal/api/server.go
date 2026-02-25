@@ -248,6 +248,11 @@ func (s *Server) handleProjectManagerRoutes(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if len(parts) == 3 && parts[2] == "profile" {
+		s.handleManagerProfile(w, r, project)
+		return
+	}
+
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
@@ -257,6 +262,10 @@ type managerMessageRequest struct {
 
 type managerControlRequest struct {
 	Action string `json:"action"`
+}
+
+type managerProfileRequest struct {
+	Instructions string `json:"instructions"`
 }
 
 func (s *Server) handleManagerMessage(w http.ResponseWriter, r *http.Request, project *core.Project) {
@@ -396,6 +405,32 @@ func (s *Server) handleManagerControl(w http.ResponseWriter, r *http.Request, pr
 	})
 }
 
+func (s *Server) handleManagerProfile(w http.ResponseWriter, r *http.Request, project *core.Project) {
+	if r.Method == http.MethodGet {
+		profile, err := s.store.GetManagerProfile(r.Context(), project.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(profile)
+		return
+	}
+	if r.Method == http.MethodPost {
+		var req managerProfileRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := s.store.UpsertManagerProfile(r.Context(), project.ID, strings.TrimSpace(req.Instructions)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		return
+	}
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
+
 func (s *Server) nextPlannerReply(ctx context.Context, project *core.Project, userMessage string) (string, string) {
 	st, _ := s.store.GetPlannerState(ctx, project.ID)
 	if st == nil {
@@ -480,7 +515,12 @@ func (s *Server) runOpenClawManagerTurn(project *core.Project, userMessage strin
 	if summary != nil {
 		summaryText = compactText(summary.Summary, 500)
 	}
-	prompt := fmt.Sprintf("%s\n\nProjeto: %s\nSessão: %s\nContexto resumido: %s\nMensagem do usuário: %s", baseManagerPromptByNiche(niche), project.Name, sessionID, summaryText, userMessage)
+	profile, _ := s.store.GetManagerProfile(context.Background(), project.ID)
+	profileText := ""
+	if profile != nil && strings.TrimSpace(profile.Instructions) != "" {
+		profileText = compactText(profile.Instructions, 700)
+	}
+	prompt := fmt.Sprintf("%s\n\nAjustes de treinamento do gestor: %s\n\nProjeto: %s\nSessão: %s\nContexto resumido: %s\nMensagem do usuário: %s", baseManagerPromptByNiche(niche), emptyOrPending(profileText), project.Name, sessionID, summaryText, userMessage)
 	cmd := exec.Command("openclaw", "agent", "--agent", agentID, "--session-id", sessionID, "--message", prompt, "--json", "--timeout", "90")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -488,7 +528,15 @@ func (s *Server) runOpenClawManagerTurn(project *core.Project, userMessage strin
 	}
 	var parsed openclawAgentResult
 	if err := json.Unmarshal(out, &parsed); err != nil {
-		return "", fmt.Errorf("parse agent json failed: %v", err)
+		start := strings.Index(string(out), "{")
+		end := strings.LastIndex(string(out), "}")
+		if start >= 0 && end > start {
+			if err2 := json.Unmarshal([]byte(string(out)[start:end+1]), &parsed); err2 != nil {
+				return "", fmt.Errorf("parse agent json failed: %v", err)
+			}
+		} else {
+			return "", fmt.Errorf("parse agent json failed: %v", err)
+		}
 	}
 	if len(parsed.Result.Payloads) == 0 || strings.TrimSpace(parsed.Result.Payloads[0].Text) == "" {
 		return "Sem resposta textual do gestor OpenClaw.", nil

@@ -111,6 +111,13 @@ func (s *Store) migrate() error {
 		PRIMARY KEY (project_id, usage_date),
 		FOREIGN KEY (project_id) REFERENCES projects(id)
 	);
+
+	CREATE TABLE IF NOT EXISTS project_manager_profile (
+		project_id TEXT PRIMARY KEY,
+		instructions TEXT NOT NULL DEFAULT '',
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (project_id) REFERENCES projects(id)
+	);
 	`
 	if _, err := s.DB.Exec(query); err != nil {
 		return err
