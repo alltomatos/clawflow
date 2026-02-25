@@ -480,7 +480,13 @@ func (s *Server) updatePlanningFromState(project *core.Project, st *db.PlannerSt
 	}
 	planningPath := filepath.Join(project.Path, "docs", "PLANNING.md")
 	base := fmt.Sprintf("# PLANNING.md\n\nProjeto: %s\n\n## Triagem Inicial\n- Tipo: %s\n- Nicho: %s\n- Etapa: %s\n\n## Objetivo\n%s\n\n## Entregáveis\n%s\n\n## Próximos passos\n- Continuar execução pelo chat do gestor dedicado.\n- Atualizar este documento a cada marco relevante.\n", project.Name, emptyOrPending(st.ProjectType), emptyOrPending(st.Niche), st.Stage, emptyOrPending(st.Objective), emptyOrPending(st.Deliverables))
-	return os.WriteFile(planningPath, []byte(base), 0644)
+	if err := os.WriteFile(planningPath, []byte(base), 0644); err != nil {
+		return err
+	}
+	if st.Stage == "active" {
+		_ = s.ensureNicheDeliverables(project, st)
+	}
+	return nil
 }
 
 func emptyOrPending(v string) string {
@@ -489,6 +495,46 @@ func emptyOrPending(v string) string {
 		return "pendente"
 	}
 	return v
+}
+
+func (s *Server) ensureNicheDeliverables(project *core.Project, st *db.PlannerState) error {
+	docsDir := filepath.Join(project.Path, "docs")
+	_ = os.MkdirAll(docsDir, 0755)
+
+	writeIfMissing := func(name, content string) {
+		path := filepath.Join(docsDir, name)
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		_ = os.WriteFile(path, []byte(content), 0644)
+	}
+
+	objective := emptyOrPending(st.Objective)
+	deliverables := emptyOrPending(st.Deliverables)
+	niche := strings.ToLower(strings.TrimSpace(st.Niche))
+
+	switch niche {
+	case "software":
+		writeIfMissing("PRD.md", fmt.Sprintf("# PRD\n\n## Objetivo\n%s\n\n## Escopo MVP\n%s\n\n## Histórias de Usuário\n- Definir histórias principais\n", objective, deliverables))
+		writeIfMissing("DER.md", "# DER\n\n## Entidades\n- Definir entidades e relacionamentos\n\n## Modelo\n```mermaid\nerDiagram\n  ENTITY ||--o{ OTHER : relates\n```\n")
+		writeIfMissing("POPS.md", "# POPs Técnicos\n\n## POP: Setup local\n- Passos de ambiente\n\n## POP: Deploy\n- Checklist de release\n")
+	case "prospeccao":
+		writeIfMissing("FUNIL.md", fmt.Sprintf("# Funil de Prospecção\n\n## Objetivo\n%s\n\n## Entregáveis esperados\n%s\n\n## Etapas\n- ICP\n- Lista de leads\n- Cadência de contato\n", objective, deliverables))
+		writeIfMissing("SCRIPT_ABORDAGEM.md", "# Script de Abordagem\n\n## Primeiro contato\n- Mensagem inicial\n\n## Follow-up\n- Cadência e objeções\n")
+		writeIfMissing("METRICAS.md", "# Métricas\n\n- Taxa de resposta\n- Taxa de reunião\n- Taxa de conversão\n")
+	case "conteudo", "conteúdo":
+		writeIfMissing("CALENDARIO_EDITORIAL.md", fmt.Sprintf("# Calendário Editorial\n\n## Objetivo\n%s\n\n## Entregáveis\n%s\n\n## Plano semanal\n- Segunda: ...\n- Quarta: ...\n- Sexta: ...\n", objective, deliverables))
+		writeIfMissing("PERSONA.md", "# Persona\n\n## Público-alvo\n- Perfil\n\n## Dores\n- ...\n")
+		writeIfMissing("GUIA_ESTILO.md", "# Guia de Estilo\n\n## Tom de voz\n- ...\n\n## Formatos\n- ...\n")
+	case "gestao", "gestão", "operacional":
+		writeIfMissing("PLANO_ACAO.md", fmt.Sprintf("# Plano de Ação\n\n## Objetivo\n%s\n\n## Entregáveis\n%s\n\n## Frentes\n- Frente 1\n- Frente 2\n", objective, deliverables))
+		writeIfMissing("CHECKLISTS.md", "# Checklists Operacionais\n\n## Rotina diária\n- [ ] ...\n\n## Rotina semanal\n- [ ] ...\n")
+		writeIfMissing("POPS.md", "# POPs Operacionais\n\n## POP 01\n- Procedimento\n")
+	default:
+		writeIfMissing("ENTREGAVEIS.md", fmt.Sprintf("# Entregáveis\n\n## Objetivo\n%s\n\n## Entregáveis esperados\n%s\n", objective, deliverables))
+	}
+
+	return nil
 }
 
 func (s *Server) refreshProjectSummary(ctx context.Context, projectID string) error {
