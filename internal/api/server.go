@@ -326,8 +326,9 @@ func (s *Server) handleManagerMessage(w http.ResponseWriter, r *http.Request, pr
 		bridgeReply, err := s.runOpenClawManagerTurn(project, req.Message)
 		if err != nil {
 			mode = "bridge-fallback"
+			fmt.Printf("[bridge] fallback project=%s reason=%v\n", project.ID, err)
 			reply, _ = s.nextPlannerReply(r.Context(), project, req.Message)
-			reply = fmt.Sprintf("%s\n\n[Bridge fallback] %v", reply, err)
+			reply = fmt.Sprintf("%s\n\n[Bridge fallback] Gestor local acionado temporariamente para manter o fluxo.", reply)
 		} else {
 			reply = bridgeReply
 			_ = s.advancePlannerFromMessage(r.Context(), project, req.Message)
