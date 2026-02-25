@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
-	"github.com/alltomatos/clawflow/internal/core"
+	"github.com/alltomatos/clawproject/internal/core"
 )
 
 func (s *Store) CreateProject(ctx context.Context, p *core.Project) error {

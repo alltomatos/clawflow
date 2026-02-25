@@ -7,10 +7,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/alltomatos/clawflow/internal/agent"
-	"github.com/alltomatos/clawflow/internal/api"
-	"github.com/alltomatos/clawflow/internal/core"
-	"github.com/alltomatos/clawflow/internal/db"
+	"github.com/alltomatos/clawproject/internal/agent"
+	"github.com/alltomatos/clawproject/internal/api"
+	"github.com/alltomatos/clawproject/internal/core"
+	"github.com/alltomatos/clawproject/internal/db"
 )
 
 //go:embed all:ui

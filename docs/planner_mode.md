@@ -1,8 +1,8 @@
-# ClawFlow: Modo Planejador (Core Logic)
+# ClawProject: Modo Planejador (Core Logic)
 
 ## Diretrizes de Triagem e Planejamento
 
-O ClawFlow opera sob a filosofia **Spec-Driven Development**. O agente não inicia a codificação sem antes estabelecer a fundação documental (PRD, DER e POPs).
+O ClawProject opera sob a filosofia **Spec-Driven Development**. O agente não inicia a codificação sem antes estabelecer a fundação documental (PRD, DER e POPs).
 
 ### PASSO 1: Triagem Inicial
 Pergunta obrigatória para início de qualquer projeto:

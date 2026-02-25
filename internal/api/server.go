@@ -6,8 +6,8 @@ import (
 	"time"
 	"github.com/google/uuid"
 
-	"github.com/alltomatos/clawflow/internal/core"
-	"github.com/alltomatos/clawflow/internal/db"
+	"github.com/alltomatos/clawproject/internal/core"
+	"github.com/alltomatos/clawproject/internal/db"
 )
 
 type Server struct {

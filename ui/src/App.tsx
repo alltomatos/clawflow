@@ -28,7 +28,7 @@ const Dashboard = () => {
     setChatHistory([...chatHistory, { sender: 'user', message: message }]);
     setMessage('');
     
-    // TODO: Chamar API real do ClawFlow que roteia para o OpenClaw
+    // TODO: Chamar API real do ClawProject que roteia para o OpenClaw
   };
 
   return (
@@ -39,7 +39,7 @@ const Dashboard = () => {
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200">
             C
           </div>
-          <span className="font-extrabold text-xl tracking-tighter hidden md:block">ClawFlow</span>
+          <span className="font-extrabold text-xl tracking-tighter hidden md:block">ClawProject</span>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -99,7 +99,7 @@ const Dashboard = () => {
                 </div>
                 <h1 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">O quadro está vazio.</h1>
                 <p className="text-gray-500 text-lg mb-10 leading-relaxed font-medium">
-                  O ClawFlow utiliza o Modo Planejador para transformar suas ideias em POPs e tarefas. Qual é a visão para o seu novo projeto hoje?
+                  O ClawProject utiliza o Modo Planejador para transformar suas ideias em POPs e tarefas. Qual é a visão para o seu novo projeto hoje?
                 </p>
                 
                 <button 

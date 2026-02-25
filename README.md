@@ -1,12 +1,12 @@
-# ClawFlow 🦞
+# ClawProject 🦞
 
 **Gerenciador de Projetos Agent-Native para o Ecossistema OpenClaw.**
 
-O ClawFlow é uma ferramenta de ALM (Application Lifecycle Management) desenvolvida em Go, projetada para unir o poder de raciocínio das IAs com uma gestão visual e técnica de projetos.
+O ClawProject é uma ferramenta de ALM (Application Lifecycle Management) desenvolvida em Go, projetada para unir o poder de raciocínio das IAs com uma gestão visual e técnica de projetos.
 
 ## 🚀 Conceito
 
-Diferente de gerenciadores de tarefas tradicionais, o ClawFlow nasce de um diálogo. O fluxo padrão segue o ciclo:
+Diferente de gerenciadores de tarefas tradicionais, o ClawProject nasce de um diálogo. O fluxo padrão segue o ciclo:
 1. **Diálogo de Descoberta:** Conversa inicial com o agente.
 2. **Geração de POP:** Criação de um Procedimento Operacional Padrão flexível.
 3. **Execução Visual:** Transformação do POP em cards de Kanban e execução via subagentes.
@@ -30,8 +30,8 @@ Diferente de gerenciadores de tarefas tradicionais, o ClawFlow nasce de um diál
 ## 📝 Instalação (Draft)
 
 ```bash
-git clone https://github.com/alltomatos/clawflow
-cd clawflow
+git clone https://github.com/alltomatos/ClawProject
+cd ClawProject
 go mod download
 go run cmd/main.go
 ```

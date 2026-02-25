@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/gorilla/websocket"
-	"github.com/alltomatos/clawflow/internal/core"
+	"github.com/alltomatos/clawproject/internal/core"
 )
 
 // Client representa a conexo com o Gateway OpenClaw
