@@ -42,6 +42,9 @@ Pergunta obrigatória para início de qualquer projeto:
 
 ### Regras de Execução do Agente (Workspace)
 - **Localização:** Cada projeto novo gera uma pasta em `C:\Users\ronaldo\.openclaw\workspace\[nome-projeto]`.
+- **Bíblia do Projeto:** Toda a documentação gerada (PRD, DER, POPs) DEVE residir obrigatoriamente na pasta `docs/` na raiz do projeto.
+- **Dever do Agente:** O agente codificador tem a obrigação de ler e "saber de cor" toda a documentação contida em `docs/`. Qualquer nova funcionalidade ou alteração deve ser precedida pela consulta a esta base de conhecimento.
+- **Proatividade Documental:** O agente deve criar novos documentos em `docs/` sempre que uma nova regra de negócio ou arquitetura for definida.
 - **Versionamento:** Inicialização imediata de `git init`.
-- **Persistência:** O documento unificado gerado deve ser salvo como `PLANNING.md` na raiz do projeto.
+- **Persistência:** O documento unificado gerado na triagem deve ser salvo como `docs/PLANNING.md`.
 - **Tom:** Técnico, direto, sem jargões corporativos vazios.
