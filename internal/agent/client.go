@@ -6,26 +6,25 @@ import (
 	"log"
 	"net/url"
 	"runtime"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/alltomatos/clawflow/internal/core"
 )
 
-// Client representa a conexo com o Gateway OpenClaw
+// Client representa a conexão com o Gateway OpenClaw
 type Client struct {
 	conn   *websocket.Conn
 	config *core.OpenClawConfig
 }
 
-// NewClient cria uma nova instncia do cliente agentico
+// NewClient cria uma nova instância do cliente agentico
 func NewClient(cfg *core.OpenClawConfig) *Client {
 	return &Client{
 		config: cfg,
 	}
 }
 
-// Connect inicia a conexo WebSocket e realiza o handshake
+// Connect inicia a conexão WebSocket e realiza o handshake
 func (c *Client) Connect() error {
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("127.0.0.1:%d", c.config.Gateway.Port), Path: "/ws"}
 	log.Printf("Conectando ao Gateway OpenClaw em %s", u.String())
@@ -56,7 +55,7 @@ func (c *Client) listen() {
 			continue
 		}
 
-		// Lgica de resposta ao challenge do protocolo v3
+		// Lógica de resposta ao challenge do protocolo v3
 		if msg["event"] == "connect.challenge" {
 			log.Println("Challenge recebido. Respondendo com Handshake...")
 			c.sendHandshake()
@@ -65,25 +64,27 @@ func (c *Client) listen() {
 }
 
 func (c *Client) sendHandshake() {
-	// Protocolo v3: O client.mode DEVE ser "operator" ou "node".
-	// Para ferramentas de controle/CLI, o ID deve ser "cli" e o mode "operator".
+	// Protocolo v3: Inserindo device identity para conformidade
 	handshake := map[string]interface{}{
 		"type": "req",
-		"id":   fmt.Sprintf("clawflow-%d", time.Now().Unix()),
+		"id":   "h1",
 		"method": "connect",
 		"params": map[string]interface{}{
 			"minProtocol": 3,
 			"maxProtocol": 3,
 			"role":        "operator",
 			"scopes":      []string{"operator.read", "operator.write"},
-			"auth": map[string]string{
+			"auth": map[string]interface{}{
 				"token": c.config.Gateway.Token,
 			},
 			"client": map[string]interface{}{
-				"id":       "cli", 
+				"id":       "cli",
 				"version":  "1.0.0",
 				"platform": runtime.GOOS,
 				"mode":     "operator",
+			},
+			"device": map[string]interface{}{
+				"id": "clawflow-local-system",
 			},
 		},
 	}

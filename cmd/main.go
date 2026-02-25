@@ -8,11 +8,12 @@ import (
 	"net/http"
 
 	"github.com/alltomatos/clawflow/internal/agent"
+	"github.com/alltomatos/clawflow/internal/api"
 	"github.com/alltomatos/clawflow/internal/core"
 	"github.com/alltomatos/clawflow/internal/db"
 )
 
-//go:embed ui/*
+//go:embed all:ui
 var uiAssets embed.FS
 
 func main() {
@@ -37,21 +38,21 @@ func main() {
 	client := agent.NewClient(cfg)
 	go func() {
 		if err := client.Connect(); err != nil {
-			fmt.Printf("Aviso: No foi possvel conectar ao Gateway: %v\n", err)
+			fmt.Printf("Aviso: Falha na conexão agentica: %v\n", err)
 		}
 	}()
 
-	// 4. Servir Frontend Embutido
-	// Usamos a pasta 'ui' que criamos dentro de 'cmd' para o embed
-	distFS, err := fs.Sub(uiAssets, "ui")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// 4. Inicializar APIs
+	apiServer := api.NewServer(store)
+	apiServer.RegisterHandlers()
+
+	// 5. Servir Frontend Embutido
+	distFS, _ := fs.Sub(uiAssets, "ui")
 	
 	http.Handle("/", http.FileServer(http.FS(distFS)))
 
 	serverPort := 19192
-	fmt.Printf("Dashboard disponvel em: http://0.0.0.0:%d\n", serverPort)
+	fmt.Printf("Dashboard disponível em: http://0.0.0.0:%d\n", serverPort)
 	
 	if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", serverPort), nil); err != nil {
 		log.Fatal(err)
