@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -186,6 +187,7 @@ func (s *Server) handleProjectManagerRoutes(w http.ResponseWriter, r *http.Reque
 		s.managerRuntime.mu.Lock()
 		calls := s.managerRuntime.calls[projectID]
 		s.managerRuntime.mu.Unlock()
+		dailyCalls, _ := s.store.GetDailyManagerUsage(r.Context(), projectID, time.Now().Format("2006-01-02"))
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"project_id":          project.ID,
 			"manager_session_key": project.ManagerSessionKey,
@@ -193,6 +195,7 @@ func (s *Server) handleProjectManagerRoutes(w http.ResponseWriter, r *http.Reque
 			"manager_status":      project.ManagerStatus,
 			"manager_enabled":     s.managerEnabled,
 			"api_calls":           calls,
+			"daily_calls":         dailyCalls,
 		})
 		return
 	}
@@ -248,6 +251,24 @@ func (s *Server) handleManagerMessage(w http.ResponseWriter, r *http.Request, pr
 	s.managerRuntime.calls[projectID]++
 	calls := s.managerRuntime.calls[projectID]
 	s.managerRuntime.mu.Unlock()
+
+	dailyLimit := resolveDailyManagerLimit()
+	today := time.Now().Format("2006-01-02")
+	dailyCalls, err := s.store.GetDailyManagerUsage(r.Context(), project.ID, today)
+	if err == nil && dailyCalls >= dailyLimit {
+		s.managerRuntime.mu.Lock()
+		s.managerRuntime.busy[projectID] = false
+		s.managerRuntime.mu.Unlock()
+		http.Error(w, fmt.Sprintf("daily manager limit reached (%d/%d)", dailyCalls, dailyLimit), http.StatusTooManyRequests)
+		return
+	}
+	if _, err := s.store.IncrementDailyManagerUsage(r.Context(), project.ID, today); err != nil {
+		s.managerRuntime.mu.Lock()
+		s.managerRuntime.busy[projectID] = false
+		s.managerRuntime.mu.Unlock()
+		http.Error(w, "failed to register manager usage", http.StatusInternalServerError)
+		return
+	}
 
 	_ = s.store.AddProjectMessage(r.Context(), project.ID, "user", req.Message)
 
@@ -322,6 +343,10 @@ func (s *Server) handleManagerControl(w http.ResponseWriter, r *http.Request, pr
 	if err := s.store.UpdateProjectManager(r.Context(), project.ID, sessionKey, agentID, status); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if action == "restart" && s.managerEnabled {
+		go s.warmupManagerSession(project.ID, sessionKey, agentID)
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -406,7 +431,17 @@ func (s *Server) runOpenClawManagerTurn(project *core.Project, userMessage strin
 	if agentID == "" {
 		agentID = "main"
 	}
-	prompt := fmt.Sprintf("Você é o gestor especialista deste projeto. Projeto: %s. Regras: siga docs/PLANNING.md, mantenha foco em próximos passos práticos e baixo custo de API. Mensagem do usuário: %s", project.Name, userMessage)
+	st, _ := s.store.GetPlannerState(context.Background(), project.ID)
+	niche := "geral"
+	if st != nil && strings.TrimSpace(st.Niche) != "" {
+		niche = st.Niche
+	}
+	summary, _ := s.store.GetProjectSummary(context.Background(), project.ID)
+	summaryText := ""
+	if summary != nil {
+		summaryText = compactText(summary.Summary, 500)
+	}
+	prompt := fmt.Sprintf("%s\n\nProjeto: %s\nSessão: %s\nContexto resumido: %s\nMensagem do usuário: %s", baseManagerPromptByNiche(niche), project.Name, sessionID, summaryText, userMessage)
 	cmd := exec.Command("openclaw", "agent", "--agent", agentID, "--session-id", sessionID, "--message", prompt, "--json", "--timeout", "90")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -601,6 +636,40 @@ func toBullets(items []string) string {
 		lines = append(lines, "- "+it)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func resolveDailyManagerLimit() int {
+	raw := strings.TrimSpace(os.Getenv("OPENCLAW_MANAGER_DAILY_LIMIT"))
+	if raw == "" {
+		return 120
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return 120
+	}
+	return n
+}
+
+func baseManagerPromptByNiche(niche string) string {
+	switch strings.ToLower(strings.TrimSpace(niche)) {
+	case "software":
+		return "Você é gestor de projeto de software. Seja técnico, pragmático, entregue próximos passos acionáveis e mantenha docs/PLANNING.md atualizado por marcos."
+	case "prospeccao":
+		return "Você é gestor de prospecção/vendas. Foque em funil, ICP, scripts, cadência e métricas de conversão com ações objetivas."
+	case "conteudo", "conteúdo":
+		return "Você é gestor de conteúdo. Foque em persona, calendário editorial, formatos, distribuição e métricas de performance."
+	case "gestao", "gestão", "operacional":
+		return "Você é gestor operacional. Foque em processos, checklists, responsabilidades, riscos e melhoria contínua."
+	default:
+		return "Você é gestor especialista de projeto multi-nicho. Entregue decisões claras, riscos e próximos passos práticos."
+	}
+}
+
+func (s *Server) warmupManagerSession(projectID, sessionID, agentID string) {
+	msg := "Inicie a sessão do gestor deste projeto. Responda apenas: GESTOR_PRONTO."
+	cmd := exec.Command("openclaw", "agent", "--agent", agentID, "--session-id", sessionID, "--message", msg, "--json", "--timeout", "30")
+	_ = cmd.Run()
+	_ = s.store.AddProjectMessage(context.Background(), projectID, "agent", "[manager-restart] sessão reinicializada")
 }
 
 func sanitizePathName(name string) string {
