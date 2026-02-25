@@ -28,10 +28,11 @@ type Server struct {
 }
 
 type managerRuntime struct {
-	mu          sync.Mutex
-	lastMessage map[string]time.Time
-	calls       map[string]int
-	busy        map[string]bool
+	mu           sync.Mutex
+	lastMessage  map[string]time.Time
+	lastWarmup   map[string]time.Time
+	calls        map[string]int
+	busy         map[string]bool
 }
 
 func NewServer(store *db.Store) *Server {
@@ -42,6 +43,7 @@ func NewServer(store *db.Store) *Server {
 		managerEnabled: enabled,
 		managerRuntime: &managerRuntime{
 			lastMessage: map[string]time.Time{},
+			lastWarmup:  map[string]time.Time{},
 			calls:       map[string]int{},
 			busy:        map[string]bool{},
 		},
@@ -992,6 +994,17 @@ func baseManagerPromptByNiche(niche string) string {
 }
 
 func (s *Server) warmupManagerSession(projectID, sessionID, agentID string) {
+	s.managerRuntime.mu.Lock()
+	if last, ok := s.managerRuntime.lastWarmup[projectID]; ok {
+		if time.Since(last) < 15*time.Second {
+			s.managerRuntime.mu.Unlock()
+			fmt.Printf("[bridge] warmup skipped project=%s (cooldown active)\n", projectID)
+			return
+		}
+	}
+	s.managerRuntime.lastWarmup[projectID] = time.Now()
+	s.managerRuntime.mu.Unlock()
+
 	msg := "Inicie a sessão do gestor deste projeto. Responda apenas: GESTOR_PRONTO."
 	cmd := exec.Command("openclaw", "agent", "--agent", agentID, "--session-id", sessionID, "--message", msg, "--json", "--timeout", "30")
 	_ = cmd.Run()
