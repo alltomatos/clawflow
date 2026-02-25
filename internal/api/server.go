@@ -316,7 +316,7 @@ func (s *Server) handleManagerControl(w http.ResponseWriter, r *http.Request, pr
 }
 
 func (s *Server) refreshProjectSummary(ctx context.Context, projectID string) error {
-	messages, err := s.store.ListProjectMessages(ctx, projectID, 30)
+	messages, err := s.store.ListProjectMessages(ctx, projectID, 120)
 	if err != nil {
 		return err
 	}
@@ -324,34 +324,114 @@ func (s *Server) refreshProjectSummary(ctx context.Context, projectID string) er
 		return nil
 	}
 
-	var userCount, agentCount int
-	lastUser := ""
-	lastAgent := ""
+	previous, _ := s.store.GetProjectSummary(ctx, projectID)
+	previousText := ""
+	if previous != nil {
+		previousText = previous.Summary
+	}
+
+	userMsgs := []string{}
+	agentMsgs := []string{}
 	for _, m := range messages {
 		if m.Sender == "user" {
-			userCount++
-			lastUser = m.Message
+			userMsgs = append(userMsgs, m.Message)
 		} else {
-			agentCount++
-			lastAgent = m.Message
+			agentMsgs = append(agentMsgs, m.Message)
 		}
 	}
 
-	cut := func(v string) string {
-		v = strings.TrimSpace(v)
-		if len(v) > 220 {
-			return v[:220] + "..."
-		}
-		if v == "" {
-			return "(vazio)"
-		}
-		return v
+	latestUser := "(sem entrada)"
+	if len(userMsgs) > 0 {
+		latestUser = compactText(userMsgs[len(userMsgs)-1], 180)
+	}
+	latestAgent := "(sem resposta)"
+	if len(agentMsgs) > 0 {
+		latestAgent = compactText(agentMsgs[len(agentMsgs)-1], 180)
 	}
 
-	summary := fmt.Sprintf("Resumo automático do projeto\n- Interações: %d (user: %d | gestor: %d)\n- Última solicitação: %s\n- Última resposta do gestor: %s\n- Atualização: %s",
-		len(messages), userCount, agentCount, cut(lastUser), cut(lastAgent), time.Now().Format(time.RFC3339))
+	objectives := collectMilestones(userMsgs, []string{"objetivo", "meta", "resultado", "mvp", "entreg"}, 3)
+	decisions := collectMilestones(userMsgs, []string{"decid", "escolh", "vamos", "usar", "padrão", "stack"}, 4)
+	blockers := collectMilestones(userMsgs, []string{"bloque", "erro", "falha", "problema", "risco", "imped"}, 3)
+	nextSteps := collectMilestones(userMsgs, []string{"próximo", "next", "fazer", "etapa", "seguir", "depois"}, 4)
+
+	if len(objectives) == 0 {
+		objectives = []string{"Objetivo ainda não explicitado claramente no chat."}
+	}
+	if len(nextSteps) == 0 {
+		nextSteps = []string{"Definir próximo passo acionável com prazo curto."}
+	}
+
+	carry := compactPreviousSummary(previousText, 380)
+	summary := fmt.Sprintf("Resumo estratégico do projeto (auto-update)\n\n[Estado]\n- Interações: %d (user: %d | gestor: %d)\n- Última solicitação: %s\n- Última resposta do gestor: %s\n\n[Objetivo]\n%s\n\n[Decisões]\n%s\n\n[Bloqueios/Riscos]\n%s\n\n[Próximos passos]\n%s\n\n[Memória compactada]\n%s\n\n[Atualizado em]\n- %s",
+		len(messages), len(userMsgs), len(agentMsgs), latestUser, latestAgent,
+		toBullets(objectives), toBullets(decisions), toBullets(blockers), toBullets(nextSteps), carry,
+		time.Now().Format(time.RFC3339))
 
 	return s.store.UpsertProjectSummary(ctx, projectID, summary)
+}
+
+func collectMilestones(messages []string, keywords []string, max int) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for i := len(messages) - 1; i >= 0; i-- {
+		m := strings.ToLower(strings.TrimSpace(messages[i]))
+		if m == "" {
+			continue
+		}
+		matched := false
+		for _, k := range keywords {
+			if strings.Contains(m, k) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		item := compactText(messages[i], 150)
+		if !seen[item] {
+			out = append(out, item)
+			seen[item] = true
+		}
+		if len(out) >= max {
+			break
+		}
+	}
+	// reverse para manter ordem mais natural (antigo -> recente)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
+}
+
+func compactText(v string, max int) string {
+	v = strings.Join(strings.Fields(strings.TrimSpace(v)), " ")
+	if v == "" {
+		return "(vazio)"
+	}
+	if len(v) > max {
+		return v[:max] + "..."
+	}
+	return v
+}
+
+func compactPreviousSummary(summary string, max int) string {
+	summary = compactText(summary, max)
+	if summary == "(vazio)" {
+		return "Sem memória anterior consolidada."
+	}
+	return summary
+}
+
+func toBullets(items []string) string {
+	if len(items) == 0 {
+		return "- (sem itens)"
+	}
+	lines := make([]string, 0, len(items))
+	for _, it := range items {
+		lines = append(lines, "- "+it)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func sanitizePathName(name string) string {
