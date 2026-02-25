@@ -15,6 +15,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [displayMode, setDisplayMode] = useState<'grid' | 'table'>('grid');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'offline' | 'paused'>('all');
 
   const [message, setMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatItem[]>([{ sender: 'agent', message: 'Selecione um projeto e converse com o gestor.' }]);
@@ -33,6 +34,7 @@ const Dashboard = () => {
   const version = '0.1.9-beta';
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null;
+  const filteredProjects = projects.filter((p) => statusFilter === 'all' ? true : p.manager_status === statusFilter);
   const managerOnline = manager?.manager_status === 'active';
   const plannerStages = ['triage_type', 'triage_niche', 'objective', 'deliverables', 'active'];
   const stageLabels: Record<string, string> = { triage_type: 'Tipo', triage_niche: 'Nicho', objective: 'Objetivo', deliverables: 'Entregáveis', active: 'Execução' };
@@ -184,17 +186,21 @@ const Dashboard = () => {
 
             {view === 'projects' && (
               <motion.div key="projects" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full p-6 overflow-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setDisplayMode('grid')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 ${displayMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}><LayoutGrid size={14} /> Grid</button>
-                    <button onClick={() => setDisplayMode('table')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 ${displayMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}><Table2 size={14} /> Tabela</button>
+                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button onClick={() => setDisplayMode('grid')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 ${displayMode === 'grid' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><LayoutGrid size={14} /> Grid</button>
+                    <button onClick={() => setDisplayMode('table')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 ${displayMode === 'table' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><Table2 size={14} /> Tabela</button>
+                    <button onClick={() => setStatusFilter('all')} className={`px-3 py-2 rounded-lg text-xs font-bold ${statusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Todos</button>
+                    <button onClick={() => setStatusFilter('active')} className={`px-3 py-2 rounded-lg text-xs font-bold ${statusFilter === 'active' ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Ativos</button>
+                    <button onClick={() => setStatusFilter('offline')} className={`px-3 py-2 rounded-lg text-xs font-bold ${statusFilter === 'offline' ? 'bg-amber-500 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Offline</button>
+                    <button onClick={() => setStatusFilter('paused')} className={`px-3 py-2 rounded-lg text-xs font-bold ${statusFilter === 'paused' ? 'bg-orange-500 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>Pausado</button>
                   </div>
-                  <button onClick={() => setView('newProject')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><Plus size={16} /> Novo Projeto</button>
+                  <button onClick={() => setView('newProject')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm"><Plus size={16} /> Novo Projeto</button>
                 </div>
 
                 {displayMode === 'grid' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {projects.map((p) => (
+                    {filteredProjects.map((p) => (
                       <button key={p.id} onClick={() => openProject(p.id)} className="text-left bg-white border rounded-2xl p-4 hover:border-indigo-400">
                         <div className="font-bold text-sm mb-1 truncate">{p.name || p.id}</div>
                         <div className="text-xs text-slate-500 mb-2 truncate">{p.description || 'Sem descrição'}</div>
@@ -207,7 +213,7 @@ const Dashboard = () => {
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50"><tr><th className="text-left p-3">Projeto</th><th className="text-left p-3">Descrição</th><th className="text-left p-3">Gestor</th><th className="text-left p-3">Ação</th></tr></thead>
                       <tbody>
-                        {projects.map((p) => (
+                        {filteredProjects.map((p) => (
                           <tr key={p.id} className="border-t">
                             <td className="p-3 font-semibold">{p.name || p.id}</td>
                             <td className="p-3 text-slate-500">{p.description || '-'}</td>
@@ -291,3 +297,4 @@ const ChatBubble = ({ sender, message }: { sender: 'agent' | 'user'; message: st
 );
 
 export default Dashboard;
+
