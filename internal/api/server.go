@@ -251,7 +251,22 @@ func (s *Server) handleManagerMessage(w http.ResponseWriter, r *http.Request, pr
 
 	_ = s.store.AddProjectMessage(r.Context(), project.ID, "user", req.Message)
 
-	reply, mode := s.nextPlannerReply(r.Context(), project, req.Message)
+	reply := ""
+	mode := "local-fallback"
+	if s.managerEnabled {
+		mode = "openclaw-bridge"
+		bridgeReply, err := s.runOpenClawManagerTurn(project, req.Message)
+		if err != nil {
+			mode = "bridge-fallback"
+			reply, _ = s.nextPlannerReply(r.Context(), project, req.Message)
+			reply = fmt.Sprintf("%s\n\n[Bridge fallback] %v", reply, err)
+		} else {
+			reply = bridgeReply
+			_ = s.advancePlannerFromMessage(r.Context(), project, req.Message)
+		}
+	} else {
+		reply, _ = s.nextPlannerReply(r.Context(), project, req.Message)
+	}
 	_ = s.store.AddProjectMessage(r.Context(), project.ID, "agent", reply)
 	_ = s.refreshProjectSummary(r.Context(), project.ID)
 
@@ -318,11 +333,6 @@ func (s *Server) handleManagerControl(w http.ResponseWriter, r *http.Request, pr
 }
 
 func (s *Server) nextPlannerReply(ctx context.Context, project *core.Project, userMessage string) (string, string) {
-	mode := "openclaw-enabled"
-	if !s.managerEnabled {
-		mode = "local-fallback"
-	}
-
 	st, _ := s.store.GetPlannerState(ctx, project.ID)
 	if st == nil {
 		st = &db.PlannerState{ProjectID: project.ID, Stage: "triage_type"}
@@ -367,7 +377,49 @@ func (s *Server) nextPlannerReply(ctx context.Context, project *core.Project, us
 
 	_ = s.store.UpsertPlannerState(ctx, st)
 	_ = s.updatePlanningFromState(project, st)
-	return reply, mode
+	return reply, "local"
+}
+
+func (s *Server) advancePlannerFromMessage(ctx context.Context, project *core.Project, userMessage string) error {
+	_, _ = s.nextPlannerReply(ctx, project, userMessage)
+	return nil
+}
+
+type openclawAgentResult struct {
+	Status string `json:"status"`
+	Result struct {
+		Payloads []struct {
+			Text string `json:"text"`
+		} `json:"payloads"`
+	} `json:"result"`
+}
+
+func (s *Server) runOpenClawManagerTurn(project *core.Project, userMessage string) (string, error) {
+	if project == nil {
+		return "", fmt.Errorf("project nil")
+	}
+	sessionID := strings.TrimSpace(project.ManagerSessionKey)
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("pm-%s", project.ID)
+	}
+	agentID := strings.TrimSpace(project.ManagerAgentID)
+	if agentID == "" {
+		agentID = "main"
+	}
+	prompt := fmt.Sprintf("Você é o gestor especialista deste projeto. Projeto: %s. Regras: siga docs/PLANNING.md, mantenha foco em próximos passos práticos e baixo custo de API. Mensagem do usuário: %s", project.Name, userMessage)
+	cmd := exec.Command("openclaw", "agent", "--agent", agentID, "--session-id", sessionID, "--message", prompt, "--json", "--timeout", "90")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("openclaw agent failed: %v | %s", err, strings.TrimSpace(string(out)))
+	}
+	var parsed openclawAgentResult
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		return "", fmt.Errorf("parse agent json failed: %v", err)
+	}
+	if len(parsed.Result.Payloads) == 0 || strings.TrimSpace(parsed.Result.Payloads[0].Text) == "" {
+		return "Sem resposta textual do gestor OpenClaw.", nil
+	}
+	return parsed.Result.Payloads[0].Text, nil
 }
 
 func detectNiche(msg string) string {
